@@ -84,15 +84,15 @@ void gen_and_check_hash(unsigned long int *Temp, unsigned long int *Hash, unsign
 
   random_array(Temp, MAX_OBJ);
 
-  for (int i = 0; i < MAX_OBJ; i++)
-  {
-    insert_in_hash(Hash, Temp[i]);
-  }
+  // for (unsigned long int i = 0; i < MAX_OBJ; i++)
+  // {
+  //   insert_in_hash(Hash, Temp[i]);
+  // }
 
-  // TODO: sortしてuniqe keyを保証する
+  // // TODO: sortしてuniqe keyを保証する
 
-  for (int i = 0; i < MAX_OBJ; i++)
-  {
-    get_from_hash(Hash, Temp[i]);
-  }
+  // for (unsigned long int i = 0; i < MAX_OBJ; i++)
+  // {
+  //   get_from_hash(Hash, Temp[i]);
+  // }
 }

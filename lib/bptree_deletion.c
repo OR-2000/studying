@@ -14,31 +14,32 @@ unsigned long int get_head_key(struct NODE *node)
 
 int remove_key_from_leaf(struct NODE *leaf, unsigned long int key)
 {
-  int match = 0;
-  int idx;
+  int idx = -1;
 
-  for (int i = 0; i < leaf->nkey - 1; i++)
+  for (int i = 0; i < leaf->nkey; i++)
   {
     if (leaf->key[i] == key)
     {
       idx = i;
-      match = 1;
-    }
-
-    if (match)
-    {
-      leaf->key[i] = leaf->key[i + 1];
-      leaf->chi[i] = leaf->chi[i + 1];
-      leaf->key[i + 1] = 0;
-      leaf->chi[i + 1] = NULL;
+      leaf->key[i] = 0;
+      leaf->chi[i] = NULL;
+      leaf->nkey--;
+      break;
     }
   }
-  leaf->nkey--;
 
-  if (leaf->nkey == 0 && Root == leaf)
+  if (idx == -1)
   {
-    printf("Root come to be null: []");
+    printf("deletion: Key not found: %lu:", key);
     exit(1);
+  }
+
+  for (int i = idx; i < leaf->nkey; i++)
+  {
+    leaf->key[i] = leaf->key[i + 1];
+    leaf->chi[i] = leaf->chi[i + 1];
+    leaf->key[i + 1] = 0;
+    leaf->chi[i + 1] = NULL;
   }
 
   if (leaf->nkey == 0)
@@ -56,47 +57,6 @@ int remove_key_from_leaf(struct NODE *leaf, unsigned long int key)
   return -1;
 }
 
-int find_affordable_neighbor_node(struct NODE *parent, int poor, int mixLine)
-{
-  struct NODE *left;
-  struct NODE *right;
-
-  if (poor == 0)
-  {
-    right = parent->chi[poor + 1];
-
-    if (mixLine < right->nkey)
-    {
-      return poor + 1;
-    }
-  }
-  else if (poor == parent->nkey)
-  {
-    left = parent->chi[poor - 1];
-
-    if (mixLine < left->nkey)
-    {
-      return poor - 1;
-    }
-  }
-  else
-  {
-    left = parent->chi[poor - 1];
-    right = parent->chi[poor + 1];
-
-    if (mixLine < left->nkey)
-    {
-      return poor - 1;
-    }
-    else if (mixLine < right->nkey)
-    {
-      return poor + 1;
-    }
-  }
-
-  return -1;
-}
-
 void swap_the_key(struct NODE *node, int chiIdx)
 {
   unsigned long int minKey = get_head_key(node->chi[chiIdx]);
@@ -104,38 +64,48 @@ void swap_the_key(struct NODE *node, int chiIdx)
   node->key[chiIdx - 1] = minKey;
 }
 
-void deal_with_the_head_change(struct NODE *child)
+void deal_with_head_change(struct NODE *node)
 {
-  if (!child->parent)
+  if (!node->parent)
   {
     return;
   }
 
-  struct NODE *parent = child->parent;
-  int nkey = parent->nkey;
-  int chiIdx;
+  struct NODE *parent = node->parent;
+  int idx;
 
-  for (int i = 0; i < nkey + 1; i++)
+  for (int i = 0; i < parent->nkey + 1; i++)
   {
-    if (parent->chi[i] == child)
+    if (parent->chi[i] == node)
     {
-      chiIdx = i;
+      idx = i;
     }
   }
 
-  if (chiIdx == 0)
+  if (idx == 0)
   {
-    deal_with_the_head_change(parent);
+    deal_with_head_change(parent);
   }
   else
   {
-    swap_the_key(parent, chiIdx);
+    swap_the_key(parent, idx);
   }
 }
 
-void remove_leaf_from_parent(struct NODE *parent, int nullLeaf)
+void remove_from_parent(struct NODE *poor)
 {
-  for (int i = nullLeaf; i < parent->nkey; i++)
+  struct NODE *parent = poor->parent;
+  int poorIdx;
+
+  for (int i = 0; i < parent->nkey + 1; i++)
+  {
+    if (parent->chi[i] == poor)
+    {
+      poorIdx = i;
+    }
+  }
+
+  for (int i = poorIdx; i < parent->nkey; i++)
   {
     if (0 < i)
     {
@@ -149,21 +119,41 @@ void remove_leaf_from_parent(struct NODE *parent, int nullLeaf)
   }
   parent->nkey--;
 
-  if (nullLeaf == 0)
+  if (poorIdx == 0)
   {
-    deal_with_the_head_change(parent->chi[nullLeaf]);
+    deal_with_head_change(parent->chi[0]);
   }
+}
+
+struct NODE *find_affordable_parent(struct NODE *parent)
+{
+  if (parent == Root)
+  {
+    return Root;
+  }
+
+  if (2 < parent->nkey)
+  {
+    return parent;
+  }
+  else
+  {
+    return find_affordable_parent(parent->parent);
+  }
+
+  return NULL;
 }
 
 void push_leaf(struct NODE *parent, struct NODE *present)
 {
   int tail = parent->nkey;
+
   // set child
   parent->chi[tail + 1] = present;
   parent->chi[tail + 1]->parent = parent;
 
   // set key
-  parent->key[tail] = present->key[0];
+  parent->key[tail] = get_head_key(present);
   parent->nkey++;
 }
 
@@ -183,10 +173,10 @@ void unshift_leaf(struct NODE *parent, struct NODE *present)
   parent->chi[0]->parent = parent;
 
   // set key
-  parent->key[0] = get_min_key(parent->chi[1]);
+  parent->key[0] = get_head_key(parent->chi[1]);
   parent->nkey++;
 
-  deal_with_the_head_change(parent->chi[0]);
+  deal_with_head_change(parent);
 }
 
 void pop_leaf(struct NODE *parent)
@@ -203,9 +193,9 @@ void pop_leaf(struct NODE *parent)
 
 void shift_leaf(struct NODE *parent)
 {
-  for (int i = 0; i < parent->nkey + 1; i++)
+  for (int i = 0; i < parent->nkey; i++)
   {
-    if (i < parent->nkey)
+    if (i < parent->nkey - 1)
     {
       parent->key[i] = parent->key[i + 1];
     }
@@ -213,40 +203,54 @@ void shift_leaf(struct NODE *parent)
   }
   parent->nkey--;
 
-  deal_with_the_head_change(parent->chi[0]);
+  if (0 < parent->nkey)
+  {
+    deal_with_head_change(parent);
+  }
 }
 
-void pass_keys(struct NODE *parent, int nullIdx, int neighborIdx)
+void pass_keys_to_null(struct NODE *rich, struct NODE *null)
 {
   struct TEMP tmp;
+  struct NODE *parent, *left, *right;
+  int nullIdx, richIdx, num, rightIdx;
 
-  struct NODE *pass = parent->chi[neighborIdx];
+  parent = rich->parent;
 
-  struct NODE *left;
-  struct NODE *right;
-  int num = pass->nkey;
+  num = rich->nkey;
 
-  for (int i = 0; i < pass->nkey; i++)
+  for (int i = 0; i < parent->nkey + 1; i++)
   {
-    tmp.key[i] = pass->key[i];
-    tmp.chi[i] = pass->chi[i];
-    pass->key[i] = 0;
-    pass->chi[i] = NULL;
+    if (parent->chi[i] == null)
+    {
+      nullIdx = i;
+    }
+
+    if (parent->chi[i] == rich)
+    {
+      richIdx = i;
+    }
   }
-  pass->nkey = 0;
 
-  int rightIdx;
-
-  if (nullIdx < neighborIdx)
+  for (int i = 0; i < rich->nkey; i++)
   {
-    left = parent->chi[nullIdx];
-    right = parent->chi[neighborIdx];
-    rightIdx = neighborIdx;
+    tmp.key[i] = rich->key[i];
+    tmp.chi[i] = rich->chi[i];
+    rich->key[i] = 0;
+    rich->chi[i] = NULL;
+  }
+  rich->nkey = 0;
+
+  if (nullIdx < richIdx)
+  {
+    left = null;
+    right = rich;
+    rightIdx = richIdx;
   }
   else
   {
-    left = parent->chi[neighborIdx];
-    right = parent->chi[nullIdx];
+    left = rich;
+    right = null;
     rightIdx = nullIdx;
   }
 
@@ -266,116 +270,184 @@ void pass_keys(struct NODE *parent, int nullIdx, int neighborIdx)
 
   parent->key[rightIdx - 1] = right->key[0];
 
-  if (nullIdx == 0)
-  {
-    deal_with_the_head_change(parent->chi[0]);
-  }
+  deal_with_head_change(left);
+  deal_with_head_change(right);
 }
 
-void pass_leaf(struct NODE *grandpa, int from, int to, struct NODE *present)
+void pass_leaf(struct NODE *present, struct NODE *to)
 {
-  if (from < to)
-  {
-    unshift_leaf(grandpa->chi[to], present);
-    pop_leaf(grandpa->chi[from]);
-  }
-  else
-  {
-    // 右から左にパス
-    push_leaf(grandpa->chi[to], present);
-    shift_leaf(grandpa->chi[from]);
-  }
-}
+  struct NODE *parent, *from;
+  int fromIdx, toIdx;
 
-void pass_leaf_to_rich_node(struct NODE *parent, int poorLeaf, int poorNode)
-{
-  struct NODE *grandpa = parent->parent;
-  struct NODE *present = poorLeaf == 0 ? parent->chi[1] : parent->chi[0];
-
-  int adoptableNode = find_affordable_neighbor_node(grandpa, poorNode, 0);
-
-  pass_leaf(grandpa, poorNode, adoptableNode, present);
-  remove_leaf_from_parent(grandpa, poorNode);
-}
-
-void fetch_leaf_from_rich_node(struct NODE *parent, int nullLeaf, int poorIdx, int richIdx)
-{
-  struct NODE *grandpa = parent->parent;
-
-  struct NODE *richNode = grandpa->chi[richIdx];
-
-  struct NODE *present = poorIdx < richIdx
-                             ? richNode->chi[0]
-                             : richNode->chi[richNode->nkey];
-
-  remove_leaf_from_parent(parent, nullLeaf);
-
-  pass_leaf(grandpa, richIdx, poorIdx, present);
-}
-
-void passing_between_nodes(struct NODE *parent, int poorLeaf)
-{
-  struct NODE *grandpa = parent->parent;
-
-  int poorNode;
-
-  for (int i = 0; i < grandpa->nkey + 1; i++)
-  {
-    if (grandpa->chi[i] == parent)
-    {
-      poorNode = i;
-    }
-  }
-
-  int richNode = find_affordable_neighbor_node(grandpa, poorNode, 1);
-
-  if (richNode == -1)
-  {
-    pass_leaf_to_rich_node(parent, poorLeaf, poorNode);
-    return;
-  }
-
-  fetch_leaf_from_rich_node(parent, poorLeaf, poorNode, richNode);
-}
-
-void deal_with_the_null_leaf(struct NODE *nullLeaf)
-{
-  int nullIdx, neighborIdx;
-
-  struct NODE *parent = nullLeaf->parent;
+  parent = to->parent;
+  from = present->parent;
 
   for (int i = 0; i < parent->nkey + 1; i++)
   {
-    if (parent->chi[i] == nullLeaf)
+    if (parent->chi[i] == from)
     {
-      nullIdx = i;
+      fromIdx = i;
+    }
+
+    if (parent->chi[i] == to)
+    {
+      toIdx = i;
     }
   }
 
-  neighborIdx = find_affordable_neighbor_node(parent, nullIdx, 1);
-
-  if (neighborIdx == -1)
+  if (fromIdx < toIdx)
   {
-    if (2 <= parent->nkey)
+    unshift_leaf(to, present);
+    pop_leaf(from);
+  }
+  else
+  {
+    push_leaf(to, present);
+    shift_leaf(from);
+  }
+}
+
+struct NODE *find_rich_neighbor(struct NODE *poor, int minNkey)
+{
+  struct NODE *parent = poor->parent;
+  int poorIdx;
+
+  for (int i = 0; i < parent->nkey + 1; i++)
+  {
+    if (parent->chi[i] == poor)
     {
-      remove_leaf_from_parent(parent, nullIdx);
+      poorIdx = i;
+    }
+  }
 
-      struct NODE *granpa = parent->parent ? parent->parent : Root;
+  if (poorIdx == 0)
+  {
+    if (minNkey < parent->chi[poorIdx + 1]->nkey)
+    {
+      return parent->chi[poorIdx + 1];
+    }
+  }
+  else if (poorIdx == parent->nkey)
+  {
+    if (minNkey < parent->chi[poorIdx - 1]->nkey)
+    {
+      return parent->chi[poorIdx - 1];
+    }
+  }
+  else
+  {
+    if (minNkey < parent->chi[poorIdx - 1]->nkey)
+    {
+      return parent->chi[poorIdx - 1];
+    }
+    else if (minNkey < parent->chi[poorIdx + 1]->nkey)
+    {
+      return parent->chi[poorIdx + 1];
+    }
+  }
 
-      if (granpa->nkey == 0)
-      {
-        Root = parent->chi[0] ? parent->chi[0] : NULL;
-        Root->parent = NULL;
-      }
+  return NULL;
+}
 
-      return;
+void pass_to_rich(struct NODE *poor)
+{
+  struct NODE *present, *rich;
+
+  present = poor->chi[0];
+
+  rich = find_rich_neighbor(poor, 0);
+
+  pass_leaf(present, rich);
+
+  remove_from_parent(poor);
+}
+
+void pass_to_poor(struct NODE *rich, struct NODE *poor)
+{
+  struct NODE *parent, *present;
+  int poorIdx, richIdx;
+
+  parent = poor->parent;
+
+  for (int i = 0; i < parent->nkey + 1; i++)
+  {
+    if (parent->chi[i] == poor)
+    {
+      poorIdx = i;
     }
 
-    passing_between_nodes(parent, nullIdx);
+    if (parent->chi[i] == rich)
+    {
+      richIdx = i;
+    }
+  }
+
+  present = poorIdx < richIdx
+                ? rich->chi[0]
+                : rich->chi[rich->nkey];
+
+  pass_leaf(present, poor);
+}
+
+void pass_between_parent(struct NODE *poor)
+{
+  struct NODE *parent, *rich;
+
+  if (poor->parent)
+  {
+    parent = poor->parent;
+  }
+  else
+  {
     return;
   }
 
-  pass_keys(parent, nullIdx, neighborIdx);
+  rich = find_rich_neighbor(poor, 1);
+
+  if (rich == NULL)
+  {
+    pass_to_rich(poor);
+
+    if (parent->nkey == 0)
+    {
+      if (parent == Root)
+      {
+        Root = parent->chi[0];
+      }
+      else
+      {
+        pass_between_parent(parent);
+      }
+    }
+
+    return;
+  }
+
+  pass_to_poor(rich, poor);
+}
+
+void deal_with_null(struct NODE *null)
+{
+  struct NODE *rich, *poor;
+  int nullIdx;
+
+  poor = null->parent;
+
+  rich = find_rich_neighbor(null, 1);
+
+  if (rich == NULL)
+  {
+    remove_from_parent(null);
+
+    if (poor->nkey < 1)
+    {
+      pass_between_parent(poor);
+    }
+
+    return;
+  }
+
+  pass_keys_to_null(rich, null);
   return;
 }
 
@@ -385,16 +457,15 @@ void bptree_delete(unsigned long int key)
 
   int sideEffect = remove_key_from_leaf(leaf, key);
 
-  if (sideEffect == -1)
+  if (sideEffect == 0)
   {
+    deal_with_null(leaf);
     return;
   }
 
   if (sideEffect == 1)
   {
-    deal_with_the_head_change(leaf);
+    deal_with_head_change(leaf);
     return;
   }
-
-  deal_with_the_null_leaf(leaf);
 }

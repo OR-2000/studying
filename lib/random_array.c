@@ -9,7 +9,7 @@ void random_array(unsigned long int *Array, unsigned long int MAX_OBJ)
   gettimeofday(&tv, NULL);
   srand((unsigned)tv.tv_sec);
 
-  for (int i = 0; i < MAX_OBJ; i++)
+  for (unsigned long int i = 0; i < MAX_OBJ; i++)
   {
     Array[i] = (unsigned long int)rand();
   }
