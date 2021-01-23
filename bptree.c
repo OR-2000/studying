@@ -28,5 +28,6 @@ int main(int argc, char *argv[])
   {
     bptree_delete(Temp[i]);
   }
+
   exit(0);
 }
