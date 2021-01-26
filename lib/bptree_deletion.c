@@ -431,7 +431,17 @@ void deal_with_null(struct NODE *null)
   struct NODE *rich, *poor;
   int nullIdx;
 
-  poor = null->parent;
+  if (null->parent)
+  {
+    poor = null->parent;
+  }
+  else
+  {
+    Root = NULL;
+    printf("deletion finished: Root come to NULL");
+    exit(1);
+    return;
+  }
 
   rich = find_rich_neighbor(null, 1);
 
@@ -441,7 +451,17 @@ void deal_with_null(struct NODE *null)
 
     if (poor->nkey < 1)
     {
-      pass_between_parent(poor);
+      if (poor == Root)
+      {
+        poor->chi[0]->parent = NULL;
+        Root = poor->chi[0];
+      }
+      else
+      {
+        pass_between_parent(poor);
+      }
+
+      return;
     }
 
     return;
